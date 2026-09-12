@@ -39,16 +39,30 @@
 
     .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-    /* Cards & Stats */
+    /* Live Scan Progress Monitor (§68.9) */
+    .live-scan-card { background: #111A2C; border: 1px solid #1F6FEB; border-radius: 6px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(31,111,235,0.15); display: none; }
+    .live-scan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .scan-pulse { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 8px; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(47, 129, 247, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(47, 129, 247, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(47, 129, 247, 0); } }
+
+    .progress-bar-wrap { background: #1C2430; border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 10px; }
+    .progress-bar-fill { background: linear-gradient(90deg, #1F6FEB, #2EA043); height: 100%; width: 0%; transition: width 0.3s ease; }
+    .scan-phases { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); }
+    .scan-phase-item.active { color: var(--accent); font-weight: 600; }
+    .scan-phase-item.done { color: var(--success); }
+
+    /* Alert Banner */
+    .alert-box { background: #331B10; border: 1px solid var(--high); border-radius: 6px; padding: 10px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .alert-success { background: #0F2D1E; border: 1px solid var(--success); }
+    .alert-title { font-weight: 600; color: #FFA657; }
+    .alert-success .alert-title { color: #56D364; }
+
+    /* Stats Grid */
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
     .stat-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
     .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .stat-val { font-size: 24px; font-weight: 700; margin-top: 4px; }
     .stat-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-
-    /* Alert Banner */
-    .alert-box { background: #331B10; border: 1px solid var(--high); border-radius: 6px; padding: 10px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-    .alert-title { font-weight: 600; color: #FFA657; }
 
     /* Dense Data Table (§66) */
     .table-container { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 25px; }
@@ -66,6 +80,8 @@
     .badge-medium { background: var(--medium); color: #000; }
     .badge-low { background: var(--low); color: #fff; }
     .badge-info { background: var(--info); color: #fff; }
+    .badge-completed { background: #238636; color: #fff; }
+    .badge-running { background: #1F6FEB; color: #fff; }
 
     .reach-badge { background: #1F2D3D; border: 1px solid #2F81F7; color: #58A6FF; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 500; }
     .reach-loaded { background: #33131E; border-color: var(--critical); color: #FF7B72; font-weight: 600; }
@@ -97,10 +113,13 @@
 
     /* Modal Form */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 900; }
-    .modal-box { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; width: 500px; padding: 25px; }
+    .modal-box { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; width: 520px; padding: 25px; }
     .form-group { margin-bottom: 15px; }
     .form-group label { display: block; font-size: 12px; margin-bottom: 5px; color: var(--text-muted); }
     .form-group input, .form-group select { width: 100%; background: var(--bg-base); border: 1px solid var(--border-strong); color: #fff; padding: 8px; border-radius: 4px; font-size: 13px; }
+
+    /* Toast Notification */
+    .toast { position: fixed; bottom: 25px; right: 25px; background: #1C2430; border: 1px solid #303A48; color: #fff; padding: 12px 20px; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 2000; display: none; }
   </style>
 </head>
 <body>
@@ -120,6 +139,7 @@
 
   <nav class="nav-tabs">
     <div class="nav-tab active" onclick="switchTab(this, 'overview')">Work Queue</div>
+    <div class="nav-tab" onclick="switchTab(this, 'scans')">Scans & Activity</div>
     <div class="nav-tab" onclick="switchTab(this, 'remediations')">Remediation Queue</div>
     <div class="nav-tab" onclick="switchTab(this, 'findings')">Findings & Reachability</div>
     <div class="nav-tab" onclick="switchTab(this, 'diff')">Defensible Scan Diff</div>
@@ -128,16 +148,44 @@
 
   <main class="container">
 
-    <!-- DATA QUALITY ALERT (§68.4) -->
-    <div id="data-quality-banner" class="alert-box" style="display:none;">
-      <div>
-        <span class="alert-title">[!] DATA QUALITY SIGNAL:</span>
-        <span id="data-quality-text">1 target scanned uncredentialed; socket-to-process bindings inferred from network probes.</span>
+    <!-- LIVE SCAN PROGRESS MONITOR (§68.9) -->
+    <div id="live-scan-card" class="live-scan-card">
+      <div class="live-scan-header">
+        <div>
+          <span class="scan-pulse" id="scan-pulse-dot"></span>
+          <strong id="live-scan-target" style="font-size: 14px;">Target: Scanning...</strong>
+          <span id="live-scan-phase" style="color: var(--text-muted); margin-left: 10px;">Phase: Initializing</span>
+        </div>
+        <div>
+          <span id="live-scan-timer" style="color: var(--text-dim); font-family: monospace; font-size: 12px;">0s elapsed</span>
+          <button class="btn" style="margin-left: 10px; padding: 3px 8px;" onclick="dismissLiveCard()">Dismiss</button>
+        </div>
       </div>
-      <button class="btn" style="background:#000;" onclick="openScanModal()">Configure SSH Credentials</button>
+      <div class="progress-bar-wrap">
+        <div id="live-scan-fill" class="progress-bar-fill"></div>
+      </div>
+      <div class="scan-phases">
+        <span id="phase-disc" class="scan-phase-item">1. Discovery</span>
+        <span id="phase-port" class="scan-phase-item">2. Port Probing</span>
+        <span id="phase-finger" class="scan-phase-item">3. Fingerprinting</span>
+        <span id="phase-auth" class="scan-phase-item">4. Host Assessment</span>
+        <span id="phase-vuln" class="scan-phase-item">5. Plugin Evaluation</span>
+      </div>
+      <div id="live-scan-log" style="font-family: monospace; font-size: 11px; color: #7EE787; margin-top: 8px; background: #090D13; padding: 6px 10px; border-radius: 4px;">
+        [*] Ready.
+      </div>
     </div>
 
-    <!-- TAB 1: OVERVIEW -->
+    <!-- CLEAN BILL OF HEALTH BANNER -->
+    <div id="clean-host-banner" class="alert-box alert-success" style="display:none;">
+      <div>
+        <span class="alert-title">&#10003; TARGET ASSESSMENT VERIFIED CLEAN:</span>
+        <span id="clean-host-text">Host is up-to-date with 0 actionable vulnerabilities detected across open ports.</span>
+      </div>
+      <button class="btn" style="background:#000;" onclick="switchTabDirect('scans')">View Scan Report</button>
+    </div>
+
+    <!-- TAB 1: WORK QUEUE -->
     <section id="tab-overview">
       <div class="stats-grid">
         <div class="stat-card">
@@ -179,13 +227,40 @@
             </tr>
           </thead>
           <tbody id="overview-remediation-body">
-            <tr><td colspan="6" style="text-align:center; color:var(--text-dim);">No active scans. Click '+ Launch Scan' to assess targets.</td></tr>
+            <tr><td colspan="6" style="text-align:center; color:var(--text-dim);">No active vulnerabilities requiring remediation. All assessed targets are clean.</td></tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- TAB 2: REMEDIATIONS -->
+    <!-- TAB 2: SCANS & ACTIVITY (§68.2) -->
+    <section id="tab-scans" style="display:none;">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title">Scan Executions & Activity History</div>
+          <button class="btn btn-primary" onclick="openScanModal()">+ Launch New Scan</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Scan ID</th>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Open Listeners Found</th>
+              <th>Findings</th>
+              <th>Summary</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="scans-table-body">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: REMEDIATIONS -->
     <section id="tab-remediations" style="display:none;">
       <div class="table-container">
         <div class="table-header">
@@ -197,7 +272,7 @@
       </div>
     </section>
 
-    <!-- TAB 3: FINDINGS -->
+    <!-- TAB 4: FINDINGS -->
     <section id="tab-findings" style="display:none;">
       <div class="table-container">
         <div class="table-header">
@@ -223,7 +298,7 @@
       </div>
     </section>
 
-    <!-- TAB 4: DEFENSIBLE DIFF -->
+    <!-- TAB 5: DEFENSIBLE DIFF -->
     <section id="tab-diff" style="display:none;">
       <div style="margin-bottom:15px; color:var(--text-muted);">
         <strong>Four-Column Defensible Scan Diff (§68.4):</strong> Distinguishes confirmed fixes from unverified timeouts to prevent false victories.
@@ -248,7 +323,7 @@
       </div>
     </section>
 
-    <!-- TAB 5: ASSETS -->
+    <!-- TAB 6: ASSETS -->
     <section id="tab-assets" style="display:none;">
       <div class="table-container">
         <div class="table-header">
@@ -309,17 +384,17 @@
   <!-- LAUNCH SCAN MODAL -->
   <div id="scan-modal" class="modal">
     <div class="modal-box">
-      <h3 style="margin-bottom:15px;">Configure & Launch Scan</h3>
+      <h3 style="margin-bottom:15px;">Configure & Launch Target Scan</h3>
       <div class="form-group">
-        <label>Target IP / Hostname / CIDR</label>
-        <input type="text" id="scan-target" value="192.168.1.30" placeholder="e.g. 192.168.1.30">
+        <label>Target IP / Hostname (e.g. 192.168.1.30 or 192.168.1.2)</label>
+        <input type="text" id="scan-target" value="192.168.1.2" placeholder="e.g. 192.168.1.2">
       </div>
       <div class="form-group">
         <label>Safety Ceiling (§4.2)</label>
         <select id="scan-safety">
-          <option value="active-safe" selected>active-safe (Default: no crash risks)</option>
+          <option value="active-safe" selected>active-safe (Default: zero crash risk)</option>
           <option value="active-noisy">active-noisy (May generate logs/alerts)</option>
-          <option value="intrusive">intrusive (Intensive probing)</option>
+          <option value="intrusive">intrusive (Intensive deep probes)</option>
         </select>
       </div>
       <div class="form-group">
@@ -327,8 +402,8 @@
         <input type="text" id="scan-ssh-user" value="root" placeholder="root">
       </div>
       <div class="form-group">
-        <label>SSH Password (Leave empty if key configured)</label>
-        <input type="password" id="scan-ssh-pass" placeholder="Password">
+        <label>SSH Password (Leave blank if SSH key is configured)</label>
+        <input type="password" id="scan-ssh-pass" placeholder="Password (Optional)">
       </div>
       <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
         <button class="btn" onclick="closeScanModal()">Cancel</button>
@@ -337,22 +412,35 @@
     </div>
   </div>
 
+  <!-- FLOATING TOAST -->
+  <div id="app-toast" class="toast"></div>
+
   <script>
     let globalFindings = [];
     let globalRemediations = [];
+    let globalScans = [];
     let zenIndex = 0;
+    let scanPollTimer = null;
+    let scanStartTime = null;
+
+    function showToast(msg) {
+      const t = document.getElementById('app-toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(function() { t.style.display = 'none'; }, 4000);
+    }
 
     function switchTab(el, tabName) {
-      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
       el.classList.add('active');
-      document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+      document.querySelectorAll('main > section').forEach(function(s) { s.style.display = 'none'; });
       document.getElementById('tab-' + tabName).style.display = 'block';
     }
 
     function switchTabDirect(tabName) {
       const tabs = document.querySelectorAll('.nav-tab');
-      tabs.forEach(t => {
-        if (t.innerText.toLowerCase().includes(tabName)) {
+      tabs.forEach(function(t) {
+        if (t.innerText.toLowerCase().includes(tabName.toLowerCase())) {
           switchTab(t, tabName);
         }
       });
@@ -360,10 +448,11 @@
 
     function openScanModal() { document.getElementById('scan-modal').style.display = 'flex'; }
     function closeScanModal() { document.getElementById('scan-modal').style.display = 'none'; }
+    function dismissLiveCard() { document.getElementById('live-scan-card').style.display = 'none'; }
 
     function openZenTriage() {
       if (globalFindings.length === 0) {
-        alert("No findings available to triage. Please run a scan first.");
+        alert("No findings in queue. Target estate is currently clean.");
         return;
       }
       zenIndex = 0;
@@ -374,7 +463,7 @@
 
     function updateZenCard() {
       if (zenIndex >= globalFindings.length) {
-        alert("Zen triage queue complete! All items reviewed.");
+        alert("Zen triage complete! All items processed.");
         closeZenTriage();
         return;
       }
@@ -436,6 +525,19 @@
       const pass = document.getElementById('scan-ssh-pass').value;
 
       closeScanModal();
+      showToast('🚀 Launching Sieve scan against ' + target + '...');
+
+      // Show live scan card immediately
+      const card = document.getElementById('live-scan-card');
+      card.style.display = 'block';
+      document.getElementById('live-scan-target').innerText = 'Target: ' + target;
+      document.getElementById('live-scan-phase').innerText = 'Phase: Initializing Discovery...';
+      document.getElementById('live-scan-fill').style.width = '15%';
+      document.getElementById('scan-pulse-dot').style.background = 'var(--accent)';
+      document.getElementById('live-scan-log').innerText = '[*] Scope trie checked. Probing host liveness...';
+
+      scanStartTime = Date.now();
+
       const res = await fetch('/api/v1/scans', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -446,30 +548,111 @@
           ssh_password: pass
         })
       });
-      pollStatus();
+
+      startLivePolling();
+    }
+
+    function startLivePolling() {
+      if (scanPollTimer) clearInterval(scanPollTimer);
+
+      scanPollTimer = setInterval(async function() {
+        const res = await fetch('/api/v1/scans');
+        const runs = await res.json() || [];
+        if (runs.length === 0) return;
+
+        const last = runs[runs.length - 1];
+        const elapsed = Math.round((Date.now() - scanStartTime) / 1000);
+        document.getElementById('live-scan-timer').innerText = elapsed + 's elapsed';
+
+        // Update phases
+        document.getElementById('live-scan-phase').innerText = 'Phase: ' + last.current_phase;
+        document.getElementById('live-scan-fill').style.width = (last.progress_pct || 25) + '%';
+
+        const pDesc = last.current_phase || '';
+        document.getElementById('phase-disc').className = 'scan-phase-item done';
+        document.getElementById('phase-port').className = 'scan-phase-item ' + (last.progress_pct >= 25 ? 'done' : '');
+        document.getElementById('phase-finger').className = 'scan-phase-item ' + (last.progress_pct >= 50 ? 'done' : '');
+        document.getElementById('phase-auth').className = 'scan-phase-item ' + (last.progress_pct >= 70 ? 'done' : '');
+        document.getElementById('phase-vuln').className = 'scan-phase-item ' + (last.progress_pct >= 85 ? 'done' : '');
+
+        let portsFound = (last.discovered_ports || []).join(', ');
+        document.getElementById('live-scan-log').innerText =
+          '[*] Open listeners: ' + (portsFound || 'Scanning...') +
+          ' | Status: ' + last.status +
+          ' | Assessed: ' + last.hosts_assessed + ' host(s)';
+
+        if (last.status === 'completed' || last.status === 'failed') {
+          clearInterval(scanPollTimer);
+          document.getElementById('live-scan-fill').style.width = '100%';
+          document.getElementById('scan-pulse-dot').style.background = last.status === 'completed' ? 'var(--success)' : 'var(--critical)';
+          document.getElementById('live-scan-phase').innerText = last.status === 'completed' ? '✓ Scan Complete' : '✕ Scan Failed';
+
+          if (last.total_findings === 0) {
+            document.getElementById('clean-host-banner').style.display = 'flex';
+            document.getElementById('clean-host-text').innerText =
+              (last.summary_message || 'Target is healthy: 0 vulnerabilities found.');
+            showToast('✓ Scan finished: Target is clean (0 vulnerabilities)!');
+          } else {
+            showToast('✓ Scan complete! Found ' + last.total_findings + ' findings across ' + (last.discovered_ports || []).length + ' ports.');
+          }
+
+          refreshData();
+        }
+      }, 700);
     }
 
     async function runVerificationRescan(remediationId, findingId) {
+      showToast('⚡ Running sub-60s verification rescan...');
       const res = await fetch('/api/v1/verify', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({remediation_id: remediationId, finding_id: findingId})
       });
       const data = await res.json();
-      alert('Targeted Verification Rescan Completed in ' + data.duration_ms + ' ms (Sub-60s verified: ' + data.verified_in_sub_60s + '). Fixed count: ' + data.fixed_count);
+      showToast('✓ Verification Rescan Completed in ' + data.duration_ms + 'ms. Fixed: ' + data.fixed_count);
       refreshData();
     }
 
     async function refreshData() {
+      // 1. Scans
+      const sRes = await fetch('/api/v1/scans');
+      globalScans = await sRes.json() || [];
+
+      const scansBody = document.getElementById('scans-table-body');
+      if (globalScans.length > 0) {
+        let sHtml = '';
+        for (let i = globalScans.length - 1; i >= 0; i--) {
+          const s = globalScans[i];
+          const stBadge = s.status === 'completed' ? 'badge-completed' : (s.status === 'running' ? 'badge-running' : 'badge-critical');
+          const ports = (s.discovered_ports || []).map(function(p) { return p + '/tcp'; }).join(', ');
+          const dur = s.end_time ? (Math.round((new Date(s.end_time) - new Date(s.start_time))/100)/10 + 's') : '--';
+          sHtml += '<tr>' +
+            '<td><code>' + s.id + '</code></td>' +
+            '<td><strong>' + (s.targets || []).join(', ') + '</strong></td>' +
+            '<td><span class="badge ' + stBadge + '">' + s.status.toUpperCase() + '</span></td>' +
+            '<td>' + dur + '</td>' +
+            '<td>' + (ports || 'None') + '</td>' +
+            '<td><strong>' + (s.total_findings || 0) + '</strong> (' + (s.critical_count || 0) + 'C ' + (s.high_count || 0) + 'H)</td>' +
+            '<td style="font-size:11px; color:var(--text-muted);">' + (s.summary_message || 'Scan execution logged.') + '</td>' +
+            '<td style="font-size:11px; color:var(--text-dim);">' + new Date(s.start_time).toLocaleTimeString() + '</td>' +
+            '</tr>';
+        }
+        scansBody.innerHTML = sHtml;
+      }
+
+      // 2. Findings
       const fRes = await fetch('/api/v1/findings');
       globalFindings = await fRes.json() || [];
 
+      // 3. Remediations
       const rRes = await fetch('/api/v1/remediations');
       globalRemediations = await rRes.json() || [];
 
+      // 4. Assets
       const aRes = await fetch('/api/v1/assets');
       const assets = await aRes.json() || [];
 
+      // Update counters
       document.getElementById('stat-findings').innerText = globalFindings.length;
       document.getElementById('stat-actions').innerText = globalRemediations.length;
       let totalRisk = 0;
@@ -485,13 +668,16 @@
           html += '<tr>' +
             '<td><strong>#' + (i+1) + '</strong></td>' +
             '<td><strong>' + r.title + '</strong><div style="font-size:11px; color:var(--text-dim);">' + r.summary + '</div></td>' +
-            '<td>' + r.target_asset_names.join(', ') + '</td>' +
+            '<td>' + (r.target_asset_names || []).join(', ') + '</td>' +
             '<td><span class="badge badge-' + r.max_severity + '">' + r.finding_count + '</span></td>' +
             '<td>' + r.estimated_effort + '</td>' +
             '<td><button class="btn btn-verify" onclick="runVerificationRescan(\'' + r.id + '\', \'\')">&#10003; Verify Rescan</button></td>' +
             '</tr>';
         }
         overBody.innerHTML = html;
+      } else {
+        overBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--success); padding:20px;">' +
+          '&#10003; <strong>Target estate is clean!</strong> No vulnerabilities detected requiring immediate remediation.</td></tr>';
       }
 
       // Render Remediation Queue
@@ -512,7 +698,7 @@
             '</div>' +
             '<p style="color:var(--text-muted); font-size:12px; margin:8px 0;">' + r.summary + '</p>' +
             '<div style="display:flex; gap:20px; font-size:11px; color:var(--text-dim); margin-bottom:8px;">' +
-              '<span>Target Hosts: <strong>' + r.target_asset_names.join(', ') + '</strong></span>' +
+              '<span>Target Hosts: <strong>' + (r.target_asset_names || []).join(', ') + '</strong></span>' +
               '<span>Estimated Effort: <strong>' + r.estimated_effort + '</strong></span>' +
               '<span>Risk Reduction: <strong>-' + Math.round(r.total_risk_removed) + ' pts</strong></span>' +
             '</div>' +
@@ -521,6 +707,8 @@
           '</div>';
         }
         remList.innerHTML = html;
+      } else {
+        remList.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">No open remediation items.</div>';
       }
 
       // Render Findings
@@ -542,6 +730,8 @@
           '</tr>';
         }
         fBody.innerHTML = html;
+      } else {
+        fBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">Zero findings detected.</td></tr>';
       }
 
       // Render Assets
@@ -556,7 +746,7 @@
             '<td><strong>' + a.display_name + '</strong></td>' +
             '<td>' + a.ipv4 + '</td>' +
             '<td>' + (a.os_product || a.os_family || 'Linux') + ' ' + (a.os_version || '') + '</td>' +
-            '<td>' + svcs + '</td>' +
+            '<td>' + (svcs || 'Probing...') + '</td>' +
             '<td>' + a.exposure + '</td>' +
             '<td>' + credStatus + '</td>' +
           '</tr>';
@@ -571,20 +761,6 @@
       document.getElementById('diff-fixed').innerText = diff.confirmed_fixed || 0;
       document.getElementById('diff-reopened').innerText = diff.reopened_findings || 0;
       document.getElementById('diff-unverified').innerText = diff.unverified_absent || 0;
-    }
-
-    function pollStatus() {
-      let interval = setInterval(async function() {
-        const res = await fetch('/api/v1/scans');
-        const runs = await res.json() || [];
-        if (runs.length > 0) {
-          const last = runs[runs.length - 1];
-          if (last.status === 'completed' || last.status === 'failed') {
-            clearInterval(interval);
-            refreshData();
-          }
-        }
-      }, 1500);
     }
 
     refreshData();

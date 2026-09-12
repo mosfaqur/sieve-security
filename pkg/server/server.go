@@ -189,6 +189,12 @@ func (s *Server) executeScan(run *models.ScanRun, target, sshUser, sshPass, safe
 		return
 	}
 
+	var portList []int
+	for _, p := range openPorts {
+		portList = append(portList, p.Port)
+	}
+	run.DiscoveredPorts = portList
+
 	run.CurrentPhase = "Service Fingerprinting"
 	run.ProgressPct = 50
 
@@ -293,6 +299,12 @@ func (s *Server) executeScan(run *models.ScanRun, target, sshUser, sshPass, safe
 	remediations := s.remediator.GroupFindings(run.TenantID, detectedFindings)
 	for _, r := range remediations {
 		s.store.Remediations[r.ID] = r
+	}
+
+	if len(detectedFindings) == 0 {
+		run.SummaryMessage = fmt.Sprintf("Target %s is clean: 0 actionable vulnerabilities detected across %d open ports.", target, len(openPorts))
+	} else {
+		run.SummaryMessage = fmt.Sprintf("Target %s: %d vulnerabilities detected across %d open ports, grouped into %d remediation actions.", target, len(detectedFindings), len(openPorts), len(remediations))
 	}
 }
 

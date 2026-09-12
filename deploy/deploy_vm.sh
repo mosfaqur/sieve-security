@@ -24,12 +24,13 @@ mkdir -p "${BUNDLE_DIR}/opt/sieve/data"
 
 echo "[3/5] Syncing bundle to ${TARGET_HOST}..."
 ssh "${TARGET_USER}@${TARGET_HOST}" "mkdir -p ${INSTALL_DIR}/data ${INSTALL_DIR}/content"
-scp dist/sieve "${TARGET_USER}@${TARGET_HOST}:${INSTALL_DIR}/sieve"
+scp dist/sieve "${TARGET_USER}@${TARGET_HOST}:${INSTALL_DIR}/sieve.new"
 scp -r content/plugins "${TARGET_USER}@${TARGET_HOST}:${INSTALL_DIR}/content/"
 scp deploy/sieve.service "${TARGET_USER}@${TARGET_HOST}:/etc/systemd/system/sieve.service"
 
 echo "[4/5] Configuring firewall and systemd on ${TARGET_HOST}..."
 ssh "${TARGET_USER}@${TARGET_HOST}" bash << 'EOF'
+  mv -f /opt/sieve/sieve.new /opt/sieve/sieve
   chmod +x /opt/sieve/sieve
   
   # Ensure firewall allows Sieve Web UI port 8080

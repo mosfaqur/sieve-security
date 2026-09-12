@@ -1,0 +1,40 @@
+id: rpcbind-network-exposure
+schema_version: 2
+
+info:
+  name: SunRPC / rpcbind Service Exposed to Network Listener
+  family: network
+  severity: medium
+  cve: []
+  cwe:
+    - CWE-200
+  references:
+    - https://www.cisa.gov/news-events/alerts/2015/08/25/udp-based-amplification-attacks
+  description: The rpcbind / sunrpc portmapper service is accessible over the network. Exposed rpcbind services leak internal RPC program numbers and can be abused in UDP reflection/amplification DDoS attacks.
+  remediation: Restrict port 111 to trusted administration subnets via firewall rules or disable rpcbind if RPC services (such as NFS) are not required.
+  safety: active-safe
+  method: active_probe
+  confidence: confirmed
+  timeout_seconds: 5
+
+requires:
+  service:
+    - rpcbind
+    - sunrpc
+  ports:
+    - 111
+
+matchers_condition: and
+matchers:
+  - type: banner
+    pattern: ".*"
+
+emit:
+  title: SunRPC rpcbind Service Network Exposure
+  evidence:
+    include:
+      - service_name
+    max_bytes: 512
+  evidence_signature:
+    - rpcbind
+    - port-111

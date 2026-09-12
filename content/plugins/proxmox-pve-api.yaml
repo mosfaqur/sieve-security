@@ -1,0 +1,46 @@
+id: proxmox-pve-api-daemon-exposure
+schema_version: 2
+
+info:
+  name: Proxmox VE API / Management Daemon Exposed
+  family: hypervisor
+  severity: medium
+  cve: []
+  cwe:
+    - CWE-200
+  references:
+    - https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pve_firewall
+  description: The Proxmox VE management API daemon (pve-api-daemon / SPICE proxy) is accessible on the network, exposing hypervisor cluster management endpoints.
+  remediation: Enforce IP filtering or cluster firewall rules for ports 3128 and 8006 to prevent untrusted network access to virtualization infrastructure.
+  safety: active-safe
+  method: active_probe
+  confidence: confirmed
+  timeout_seconds: 5
+
+requires:
+  service:
+    - http
+    - https
+    - pve-api-daemon
+  ports:
+    - 3128
+    - 8006
+
+matchers_condition: or
+matchers:
+  - type: banner
+    pattern: "(?i)pve-api-daemon"
+  - type: banner
+    pattern: "(?i)proxmox"
+  - type: banner
+    pattern: "501 method"
+
+emit:
+  title: Proxmox VE Hypervisor Management Service Network Exposure
+  evidence:
+    include:
+      - banner
+    max_bytes: 512
+  evidence_signature:
+    - proxmox
+    - pve-api

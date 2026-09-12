@@ -273,14 +273,16 @@ type ScanRun struct {
 	HostsLive      int               `json:"hosts_live"`
 	HostsAssessed  int               `json:"hosts_assessed"`
 	Unreachable    int               `json:"unreachable"`
-	TotalFindings  int               `json:"total_findings"`
-	CriticalCount  int               `json:"critical_count"`
-	HighCount      int               `json:"high_count"`
-	MediumCount    int               `json:"medium_count"`
-	LowCount       int               `json:"low_count"`
-	InfoCount      int               `json:"info_count"`
-	DataQuality    DataQualityReport `json:"data_quality"`
-	Diff           DiffSummary       `json:"diff"`
+	TotalFindings   int               `json:"total_findings"`
+	DiscoveredPorts []int             `json:"discovered_ports,omitempty"`
+	SummaryMessage  string            `json:"summary_message,omitempty"`
+	CriticalCount   int               `json:"critical_count"`
+	HighCount       int               `json:"high_count"`
+	MediumCount     int               `json:"medium_count"`
+	LowCount        int               `json:"low_count"`
+	InfoCount       int               `json:"info_count"`
+	DataQuality     DataQualityReport `json:"data_quality"`
+	Diff            DiffSummary       `json:"diff"`
 }
 
 // DataQualityReport highlights scan completeness and blind spots (§68.4).
