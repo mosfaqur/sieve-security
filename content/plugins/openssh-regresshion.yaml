@@ -1,0 +1,45 @@
+id: openssh-regresshion-cve-2024-6387
+schema_version: 2
+
+info:
+  name: OpenSSH RegreSSHion Remote Code Execution Vulnerability
+  family: ssh
+  severity: critical
+  cve:
+    - CVE-2024-6387
+  cwe:
+    - CWE-362
+  references:
+    - https://www.qualys.com/2024/07/01/cve-2024-6387/regresshion.txt
+  description: A signal handler race condition vulnerability in OpenSSH's server (sshd) allows unauthenticated remote code execution as root on glibc-based Linux systems.
+  remediation: Upgrade openssh-server to version 9.8p1 or apply vendor backported patch immediately.
+  safety: active-safe
+  method: version_inference
+  confidence: probable
+  timeout_seconds: 5
+  false_positive_notes: Check distro package version (e.g. dpkg/rpm) to verify if backported fix was applied.
+
+requires:
+  service:
+    - ssh
+    - openssh
+  ports:
+    - 22
+
+matchers_condition: and
+matchers:
+  - type: banner
+    pattern: "(?i)OpenSSH"
+  - type: version
+    fixed_in: "9.8"
+    ecosystem: generic
+
+emit:
+  title: OpenSSH Server Remote Code Execution (regreSSHion - CVE-2024-6387)
+  evidence:
+    include:
+      - banner
+    max_bytes: 1024
+  evidence_signature:
+    - openssh
+    - version

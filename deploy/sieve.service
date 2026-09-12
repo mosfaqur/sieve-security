@@ -1,0 +1,20 @@
+[Unit]
+Description=Sieve Security — Vulnerability Management Platform
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/sieve
+ExecStart=/opt/sieve/sieve server --addr 0.0.0.0:8080 --plugins-dir /opt/sieve/content/plugins --data-file /opt/sieve/data/store.json
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# Security Hardening
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

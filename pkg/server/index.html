@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sieve Security — Vulnerability Management Platform</title>
+  <style>
+    :root {
+      --bg-base: #0D1117;
+      --bg-surface: #151B23;
+      --bg-raised: #1C2430;
+      --bg-hover: #222C3A;
+      --border: #232B36;
+      --border-strong: #303A48;
+      --text: #E6EDF3;
+      --text-muted: #9BA8B7;
+      --text-dim: #6B7885;
+      --critical: #C4304F;
+      --high: #D9622B;
+      --medium: #C99A1E;
+      --low: #3B87B8;
+      --info: #6E7A88;
+      --success: #2EA043;
+      --accent: #2F81F7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg-base); color: var(--text); font-size: 13px; line-height: 1.5; }
+
+    /* Layout */
+    .app-header { background: var(--bg-surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: #fff; }
+    .brand-tag { background: #232B36; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: var(--accent); }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    .nav-tabs { background: var(--bg-surface); border-bottom: 1px solid var(--border); display: flex; padding: 0 20px; gap: 20px; }
+    .nav-tab { padding: 12px 4px; cursor: pointer; color: var(--text-muted); font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+    /* Cards & Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+    .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-val { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .stat-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+    /* Alert Banner */
+    .alert-box { background: #331B10; border: 1px solid var(--high); border-radius: 6px; padding: 10px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .alert-title { font-weight: 600; color: #FFA657; }
+
+    /* Dense Data Table (§66) */
+    .table-container { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 25px; }
+    .table-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .table-title { font-weight: 600; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { background: var(--bg-raised); color: var(--text-muted); font-weight: 600; font-size: 12px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; height: 36px; }
+    tr:hover td { background: var(--bg-hover); }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-critical { background: var(--critical); color: #fff; }
+    .badge-high { background: var(--high); color: #fff; }
+    .badge-medium { background: var(--medium); color: #000; }
+    .badge-low { background: var(--low); color: #fff; }
+    .badge-info { background: var(--info); color: #fff; }
+
+    .reach-badge { background: #1F2D3D; border: 1px solid #2F81F7; color: #58A6FF; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 500; }
+    .reach-loaded { background: #33131E; border-color: var(--critical); color: #FF7B72; font-weight: 600; }
+
+    /* Buttons */
+    .btn { background: var(--bg-raised); border: 1px solid var(--border-strong); color: var(--text); padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500; transition: background 0.2s; }
+    .btn:hover { background: var(--bg-hover); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #1F6FEB; }
+    .btn-verify { background: #238636; border-color: #2EA043; color: #fff; }
+    .btn-verify:hover { background: #2EA043; }
+
+    /* Code Snippets */
+    .code-block { background: #0A0D12; border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: monospace; font-size: 12px; color: #7EE787; overflow-x: auto; margin-top: 6px; white-space: pre-wrap; }
+
+    /* Zen Triage Modal (§68.11) */
+    .zen-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .zen-card { background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 8px; width: 750px; max-width: 90vw; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+    .zen-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+    .zen-shortcuts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 25px; border-top: 1px solid var(--border); padding-top: 20px; }
+    .zen-key { background: var(--bg-raised); border: 1px solid var(--border-strong); border-radius: 4px; padding: 8px; text-align: center; font-size: 12px; cursor: pointer; }
+    .zen-key:hover { background: var(--bg-hover); }
+    .zen-key kbd { background: #0D1117; padding: 2px 6px; border-radius: 3px; border: 1px solid #303A48; font-weight: 700; color: var(--accent); }
+
+    /* 4-Column Defensible Diff (§68.4) */
+    .diff-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+    .diff-col { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 15px; }
+    .diff-col-title { font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; display: flex; justify-content: space-between; }
+
+    /* Modal Form */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 900; }
+    .modal-box { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; width: 500px; padding: 25px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-size: 12px; margin-bottom: 5px; color: var(--text-muted); }
+    .form-group input, .form-group select { width: 100%; background: var(--bg-base); border: 1px solid var(--border-strong); color: #fff; padding: 8px; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F81F7" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      Sieve Security
+      <span class="brand-tag">v3.1 Engine</span>
+    </div>
+    <div class="header-actions">
+      <span style="color: var(--text-muted); font-size: 12px;">Zone: <strong>RFC1918-Internal (zone-corp)</strong></span>
+      <button class="btn" onclick="openZenTriage()">Zen Triage <kbd style="font-size:10px; background:#000; padding:1px 4px; border-radius:3px;">Shift+Z</kbd></button>
+      <button class="btn btn-primary" onclick="openScanModal()">+ Launch Scan</button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <div class="nav-tab active" onclick="switchTab(this, 'overview')">Work Queue</div>
+    <div class="nav-tab" onclick="switchTab(this, 'remediations')">Remediation Queue</div>
+    <div class="nav-tab" onclick="switchTab(this, 'findings')">Findings & Reachability</div>
+    <div class="nav-tab" onclick="switchTab(this, 'diff')">Defensible Scan Diff</div>
+    <div class="nav-tab" onclick="switchTab(this, 'assets')">Asset Inventory</div>
+  </nav>
+
+  <main class="container">
+
+    <!-- DATA QUALITY ALERT (§68.4) -->
+    <div id="data-quality-banner" class="alert-box" style="display:none;">
+      <div>
+        <span class="alert-title">[!] DATA QUALITY SIGNAL:</span>
+        <span id="data-quality-text">1 target scanned uncredentialed; socket-to-process bindings inferred from network probes.</span>
+      </div>
+      <button class="btn" style="background:#000;" onclick="openScanModal()">Configure SSH Credentials</button>
+    </div>
+
+    <!-- TAB 1: OVERVIEW -->
+    <section id="tab-overview">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Active Exposure Risk</div>
+          <div class="stat-val" id="stat-risk" style="color: var(--critical);">--</div>
+          <div class="stat-meta">Across live network assets</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Actionable Remediations</div>
+          <div class="stat-val" id="stat-actions" style="color: var(--accent);">--</div>
+          <div class="stat-meta">~40-item target capacity</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Raw Findings</div>
+          <div class="stat-val" id="stat-findings">--</div>
+          <div class="stat-meta">Grouped into actionable fixes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Reachability Reduction</div>
+          <div class="stat-val" id="stat-reduction" style="color: var(--success);">74%</div>
+          <div class="stat-meta">Non-listening findings deprioritized</div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title">This Week's Prioritized Remediation Actions</div>
+          <button class="btn" onclick="switchTabDirect('remediations')">View All Actions &rarr;</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Priority</th>
+              <th>Action / Fix Target</th>
+              <th>Impacted Hosts</th>
+              <th>Findings</th>
+              <th>Effort</th>
+              <th>Verification</th>
+            </tr>
+          </thead>
+          <tbody id="overview-remediation-body">
+            <tr><td colspan="6" style="text-align:center; color:var(--text-dim);">No active scans. Click '+ Launch Scan' to assess targets.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 2: REMEDIATIONS -->
+    <section id="tab-remediations" style="display:none;">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title">Remediation Orchestration Queue (§50)</div>
+        </div>
+        <div id="remediations-card-list" style="padding: 15px;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: FINDINGS -->
+    <section id="tab-findings" style="display:none;">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title">Findings with Reachability Proof Stack (§1.2, §38.4)</div>
+          <span style="color:var(--text-dim); font-size:12px;">Zero False Positives Thesis</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Title / Vulnerability</th>
+              <th>Asset</th>
+              <th>Port</th>
+              <th>Reachability Proof</th>
+              <th>Confidence</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody id="findings-body">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: DEFENSIBLE DIFF -->
+    <section id="tab-diff" style="display:none;">
+      <div style="margin-bottom:15px; color:var(--text-muted);">
+        <strong>Four-Column Defensible Scan Diff (§68.4):</strong> Distinguishes confirmed fixes from unverified timeouts to prevent false victories.
+      </div>
+      <div class="diff-grid">
+        <div class="diff-col" style="border-top: 3px solid var(--critical);">
+          <div class="diff-col-title"><span>NEW FINDINGS</span><span id="diff-new">0</span></div>
+          <div id="diff-new-list" style="font-size:12px; color:var(--text-muted);">No new findings</div>
+        </div>
+        <div class="diff-col" style="border-top: 3px solid var(--success);">
+          <div class="diff-col-title"><span>CONFIRMED FIXED</span><span id="diff-fixed">0</span></div>
+          <div id="diff-fixed-list" style="font-size:12px; color:var(--text-muted);">No fixes confirmed yet</div>
+        </div>
+        <div class="diff-col" style="border-top: 3px solid var(--high);">
+          <div class="diff-col-title"><span>REOPENED</span><span id="diff-reopened">0</span></div>
+          <div id="diff-reopened-list" style="font-size:12px; color:var(--text-muted);">Zero regressions</div>
+        </div>
+        <div class="diff-col" style="border-top: 3px solid var(--medium);">
+          <div class="diff-col-title"><span>UNVERIFIED / VANISHED</span><span id="diff-unverified">0</span></div>
+          <div id="diff-unverified-list" style="font-size:12px; color:var(--text-muted);">No target timeouts</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: ASSETS -->
+    <section id="tab-assets" style="display:none;">
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title">Asset Inventory & Multi-Signal Identity (§6.2)</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Target / Display Name</th>
+              <th>IP Address</th>
+              <th>OS / Platform</th>
+              <th>Open Listeners</th>
+              <th>Exposure</th>
+              <th>Last Credentialed</th>
+            </tr>
+          </thead>
+          <tbody id="assets-body">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ZEN TRIAGE MODAL (§68.11) -->
+  <div id="zen-modal" class="zen-overlay">
+    <div class="zen-card">
+      <div class="zen-header">
+        <div>
+          <span id="zen-severity-badge" class="badge badge-critical">CRITICAL</span>
+          <span style="font-size:13px; color:var(--text-muted); margin-left:10px;" id="zen-item-counter">Item 1 of 1</span>
+        </div>
+        <button class="btn" onclick="closeZenTriage()">Exit [Esc]</button>
+      </div>
+      <h2 id="zen-title" style="font-size:18px; margin-bottom:10px;">Finding Title</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px; font-size:12px;">
+        <div>Asset: <strong id="zen-asset">--</strong></div>
+        <div>Reachability: <span id="zen-reach" class="reach-badge reach-loaded">Listening & Loaded</span></div>
+        <div>Confidence: <strong id="zen-confidence">Probable</strong></div>
+        <div>Risk Score: <strong id="zen-risk" style="color:var(--critical);">90/100</strong></div>
+      </div>
+      <div style="margin-bottom:15px;">
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">VERIFIED EVIDENCE</div>
+        <div id="zen-evidence" class="code-block">Evidence data</div>
+      </div>
+      <div class="zen-shortcuts">
+        <div class="zen-key" onclick="zenAction('ticket')"><kbd>T</kbd> Ticket (Jira)</div>
+        <div class="zen-key" onclick="zenAction('accept')"><kbd>A</kbd> Accept Risk</div>
+        <div class="zen-key" onclick="zenAction('false_positive')"><kbd>F</kbd> False Positive</div>
+        <div class="zen-key" onclick="zenAction('verify')"><kbd>V</kbd> Verify Fix</div>
+        <div class="zen-key" onclick="zenAction('next')"><kbd>N</kbd> Next Item</div>
+        <div class="zen-key" onclick="closeZenTriage()"><kbd>Esc</kbd> Exit Zen</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAUNCH SCAN MODAL -->
+  <div id="scan-modal" class="modal">
+    <div class="modal-box">
+      <h3 style="margin-bottom:15px;">Configure & Launch Scan</h3>
+      <div class="form-group">
+        <label>Target IP / Hostname / CIDR</label>
+        <input type="text" id="scan-target" value="192.168.1.30" placeholder="e.g. 192.168.1.30">
+      </div>
+      <div class="form-group">
+        <label>Safety Ceiling (§4.2)</label>
+        <select id="scan-safety">
+          <option value="active-safe" selected>active-safe (Default: no crash risks)</option>
+          <option value="active-noisy">active-noisy (May generate logs/alerts)</option>
+          <option value="intrusive">intrusive (Intensive probing)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>SSH Username (Optional for Credentialed Assessment)</label>
+        <input type="text" id="scan-ssh-user" value="root" placeholder="root">
+      </div>
+      <div class="form-group">
+        <label>SSH Password (Leave empty if key configured)</label>
+        <input type="password" id="scan-ssh-pass" placeholder="Password">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button class="btn" onclick="closeScanModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="triggerScan()">Launch Scan &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let globalFindings = [];
+    let globalRemediations = [];
+    let zenIndex = 0;
+
+    function switchTab(el, tabName) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+      document.getElementById('tab-' + tabName).style.display = 'block';
+    }
+
+    function switchTabDirect(tabName) {
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach(t => {
+        if (t.innerText.toLowerCase().includes(tabName)) {
+          switchTab(t, tabName);
+        }
+      });
+    }
+
+    function openScanModal() { document.getElementById('scan-modal').style.display = 'flex'; }
+    function closeScanModal() { document.getElementById('scan-modal').style.display = 'none'; }
+
+    function openZenTriage() {
+      if (globalFindings.length === 0) {
+        alert("No findings available to triage. Please run a scan first.");
+        return;
+      }
+      zenIndex = 0;
+      updateZenCard();
+      document.getElementById('zen-modal').style.display = 'flex';
+    }
+    function closeZenTriage() { document.getElementById('zen-modal').style.display = 'none'; }
+
+    function updateZenCard() {
+      if (zenIndex >= globalFindings.length) {
+        alert("Zen triage queue complete! All items reviewed.");
+        closeZenTriage();
+        return;
+      }
+      const f = globalFindings[zenIndex];
+      document.getElementById('zen-item-counter').innerText = 'Item ' + (zenIndex + 1) + ' of ' + globalFindings.length;
+      document.getElementById('zen-title').innerText = f.title;
+      document.getElementById('zen-asset').innerText = f.asset_display_name || f.asset_ip;
+      document.getElementById('zen-confidence').innerText = f.confidence;
+      document.getElementById('zen-risk').innerText = Math.round(f.risk_score) + '/100';
+      document.getElementById('zen-evidence').innerText = f.evidence || "No raw evidence";
+
+      const badge = document.getElementById('zen-severity-badge');
+      badge.className = 'badge badge-' + f.severity;
+      badge.innerText = f.severity.toUpperCase();
+
+      const reach = document.getElementById('zen-reach');
+      reach.innerText = f.reachability.replace(/_/g, ' ').toUpperCase();
+      reach.className = 'reach-badge ' + (f.reachability.includes('loaded') ? 'reach-loaded' : '');
+    }
+
+    function zenAction(action) {
+      const f = globalFindings[zenIndex];
+      if (action === 'accept') {
+        fetch('/api/v1/findings/state', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({dedup_key: f.dedup_key, state: 'risk_accepted'})
+        });
+      } else if (action === 'false_positive') {
+        fetch('/api/v1/findings/state', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({dedup_key: f.dedup_key, state: 'false_positive'})
+        });
+      } else if (action === 'verify') {
+        runVerificationRescan(f.remediation_id, f.dedup_key);
+      }
+      zenIndex++;
+      updateZenCard();
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.shiftKey && e.key === 'Z') { openZenTriage(); }
+      const modal = document.getElementById('zen-modal');
+      if (modal.style.display === 'flex') {
+        if (e.key === 'Escape') closeZenTriage();
+        if (e.key === 't' || e.key === 'T') zenAction('ticket');
+        if (e.key === 'a' || e.key === 'A') zenAction('accept');
+        if (e.key === 'f' || e.key === 'F') zenAction('false_positive');
+        if (e.key === 'v' || e.key === 'V') zenAction('verify');
+        if (e.key === 'n' || e.key === 'N') zenAction('next');
+      }
+    });
+
+    async function triggerScan() {
+      const target = document.getElementById('scan-target').value;
+      const safety = document.getElementById('scan-safety').value;
+      const user = document.getElementById('scan-ssh-user').value;
+      const pass = document.getElementById('scan-ssh-pass').value;
+
+      closeScanModal();
+      const res = await fetch('/api/v1/scans', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          target: target,
+          safety_ceiling: safety,
+          ssh_user: user,
+          ssh_password: pass
+        })
+      });
+      pollStatus();
+    }
+
+    async function runVerificationRescan(remediationId, findingId) {
+      const res = await fetch('/api/v1/verify', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({remediation_id: remediationId, finding_id: findingId})
+      });
+      const data = await res.json();
+      alert('Targeted Verification Rescan Completed in ' + data.duration_ms + ' ms (Sub-60s verified: ' + data.verified_in_sub_60s + '). Fixed count: ' + data.fixed_count);
+      refreshData();
+    }
+
+    async function refreshData() {
+      const fRes = await fetch('/api/v1/findings');
+      globalFindings = await fRes.json() || [];
+
+      const rRes = await fetch('/api/v1/remediations');
+      globalRemediations = await rRes.json() || [];
+
+      const aRes = await fetch('/api/v1/assets');
+      const assets = await aRes.json() || [];
+
+      document.getElementById('stat-findings').innerText = globalFindings.length;
+      document.getElementById('stat-actions').innerText = globalRemediations.length;
+      let totalRisk = 0;
+      globalFindings.forEach(function(f) { totalRisk += (f.risk_score || 0); });
+      document.getElementById('stat-risk').innerText = Math.round(totalRisk);
+
+      // Render Overview Actions
+      const overBody = document.getElementById('overview-remediation-body');
+      if (globalRemediations.length > 0) {
+        let html = '';
+        for (let i = 0; i < globalRemediations.length; i++) {
+          const r = globalRemediations[i];
+          html += '<tr>' +
+            '<td><strong>#' + (i+1) + '</strong></td>' +
+            '<td><strong>' + r.title + '</strong><div style="font-size:11px; color:var(--text-dim);">' + r.summary + '</div></td>' +
+            '<td>' + r.target_asset_names.join(', ') + '</td>' +
+            '<td><span class="badge badge-' + r.max_severity + '">' + r.finding_count + '</span></td>' +
+            '<td>' + r.estimated_effort + '</td>' +
+            '<td><button class="btn btn-verify" onclick="runVerificationRescan(\'' + r.id + '\', \'\')">&#10003; Verify Rescan</button></td>' +
+            '</tr>';
+        }
+        overBody.innerHTML = html;
+      }
+
+      // Render Remediation Queue
+      const remList = document.getElementById('remediations-card-list');
+      if (globalRemediations.length > 0) {
+        let html = '';
+        for (let i = 0; i < globalRemediations.length; i++) {
+          const r = globalRemediations[i];
+          html += '<div style="background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:15px; margin-bottom:15px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+              '<div>' +
+                '<span class="badge badge-' + r.max_severity + '">' + r.max_severity.toUpperCase() + '</span>' +
+                '<strong style="margin-left:10px; font-size:14px;">' + r.title + '</strong>' +
+              '</div>' +
+              '<div>' +
+                '<button class="btn btn-verify" onclick="runVerificationRescan(\'' + r.id + '\', \'\')">&#9889; Sub-60s Verification Rescan</button>' +
+              '</div>' +
+            '</div>' +
+            '<p style="color:var(--text-muted); font-size:12px; margin:8px 0;">' + r.summary + '</p>' +
+            '<div style="display:flex; gap:20px; font-size:11px; color:var(--text-dim); margin-bottom:8px;">' +
+              '<span>Target Hosts: <strong>' + r.target_asset_names.join(', ') + '</strong></span>' +
+              '<span>Estimated Effort: <strong>' + r.estimated_effort + '</strong></span>' +
+              '<span>Risk Reduction: <strong>-' + Math.round(r.total_risk_removed) + ' pts</strong></span>' +
+            '</div>' +
+            '<div style="font-size:11px; color:var(--text-muted); font-weight:600;">Copy-Paste Remediation Command:</div>' +
+            '<div class="code-block">' + r.cli_script + '</div>' +
+          '</div>';
+        }
+        remList.innerHTML = html;
+      }
+
+      // Render Findings
+      const fBody = document.getElementById('findings-body');
+      if (globalFindings.length > 0) {
+        let html = '';
+        for (let i = 0; i < globalFindings.length; i++) {
+          const f = globalFindings[i];
+          const reachCls = f.reachability.includes('loaded') ? 'reach-loaded' : '';
+          const evPreview = (f.evidence || '').substring(0, 45);
+          html += '<tr>' +
+            '<td><span class="badge badge-' + f.severity + '">' + f.severity.toUpperCase() + '</span></td>' +
+            '<td><strong>' + f.title + '</strong></td>' +
+            '<td>' + (f.asset_display_name || f.asset_ip) + '</td>' +
+            '<td>' + (f.port || '--') + '</td>' +
+            '<td><span class="reach-badge ' + reachCls + '">' + f.reachability.replace(/_/g, ' ') + '</span></td>' +
+            '<td>' + f.confidence + '</td>' +
+            '<td style="font-family:monospace; font-size:11px; color:#7EE787;">' + evPreview + '...</td>' +
+          '</tr>';
+        }
+        fBody.innerHTML = html;
+      }
+
+      // Render Assets
+      const aBody = document.getElementById('assets-body');
+      if (assets.length > 0) {
+        let html = '';
+        for (let i = 0; i < assets.length; i++) {
+          const a = assets[i];
+          const svcs = (a.services || []).map(function(s) { return s.port + '/' + s.service_name; }).join(', ');
+          const credStatus = a.last_credentialed ? a.last_credentialed : '<span style="color:var(--high);">Uncredentialed [!]</span>';
+          html += '<tr>' +
+            '<td><strong>' + a.display_name + '</strong></td>' +
+            '<td>' + a.ipv4 + '</td>' +
+            '<td>' + (a.os_product || a.os_family || 'Linux') + ' ' + (a.os_version || '') + '</td>' +
+            '<td>' + svcs + '</td>' +
+            '<td>' + a.exposure + '</td>' +
+            '<td>' + credStatus + '</td>' +
+          '</tr>';
+        }
+        aBody.innerHTML = html;
+      }
+
+      // Render Diff
+      const dRes = await fetch('/api/v1/diff');
+      const diff = await dRes.json();
+      document.getElementById('diff-new').innerText = diff.new_findings || 0;
+      document.getElementById('diff-fixed').innerText = diff.confirmed_fixed || 0;
+      document.getElementById('diff-reopened').innerText = diff.reopened_findings || 0;
+      document.getElementById('diff-unverified').innerText = diff.unverified_absent || 0;
+    }
+
+    function pollStatus() {
+      let interval = setInterval(async function() {
+        const res = await fetch('/api/v1/scans');
+        const runs = await res.json() || [];
+        if (runs.length > 0) {
+          const last = runs[runs.length - 1];
+          if (last.status === 'completed' || last.status === 'failed') {
+            clearInterval(interval);
+            refreshData();
+          }
+        }
+      }, 1500);
+    }
+
+    refreshData();
+  </script>
+</body>
+</html>

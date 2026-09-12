@@ -1,0 +1,42 @@
+id: varnish-http-smuggling-cve-2021-36740
+schema_version: 2
+
+info:
+  name: Varnish Cache HTTP Request Smuggling Vulnerability
+  family: web
+  severity: high
+  cve:
+    - CVE-2021-36740
+  cwe:
+    - CWE-444
+  references:
+    - https://varnish-cache.org/security/VSV00007.html
+  description: An HTTP Request Smuggling vulnerability in Varnish Cache allows an unauthenticated attacker to route crafted HTTP requests, potentially poisoning caches or bypassing ACLs.
+  remediation: Upgrade Varnish Cache to version 6.6.1, 6.5.2, or 6.0.8 or newer.
+  safety: active-safe
+  method: version_inference
+  confidence: probable
+  timeout_seconds: 5
+
+requires:
+  service:
+    - varnish
+    - http
+  ports:
+    - 6081
+    - 80
+
+matchers_condition: and
+matchers:
+  - type: banner
+    pattern: "(?i)varnish"
+
+emit:
+  title: Varnish Cache HTTP Request Smuggling Risk (CVE-2021-36740)
+  evidence:
+    include:
+      - banner
+    max_bytes: 512
+  evidence_signature:
+    - varnish
+    - smuggling

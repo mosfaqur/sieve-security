@@ -1,0 +1,43 @@
+# Binaries and build artifacts
+bin/
+dist/
+*.o
+*.a
+*.so
+*.exe
+/sieve
+/sieve-agent
+
+# Go
+vendor/
+go.work
+
+# Node / Web
+node_modules/
+web/dist/
+web/build/
+.next/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and runtime artifacts
+logs/
+*.log
+scratch/
+tmp/
+*.sqlite
+*.db
+data/
+
+# Environment and secrets
+.env
+.env.local
+*.pem
+*.key
+credentials.json

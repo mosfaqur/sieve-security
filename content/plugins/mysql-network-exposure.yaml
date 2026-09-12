@@ -1,0 +1,40 @@
+id: mysql-external-network-exposure
+schema_version: 2
+
+info:
+  name: MySQL Database Service Exposed to Network
+  family: database
+  severity: medium
+  cve: []
+  cwe:
+    - CWE-200
+  references:
+    - https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html
+  description: The MySQL database service is bound to an external network interface, exposing database authentication handshakes to network listeners.
+  remediation: Bind MySQL to 127.0.0.1 in my.cnf ('bind-address = 127.0.0.1') or enforce firewall ingress restrictions.
+  safety: active-safe
+  method: active_probe
+  confidence: confirmed
+  timeout_seconds: 5
+
+requires:
+  service:
+    - mysql
+  ports:
+    - 3306
+    - 33060
+
+matchers_condition: and
+matchers:
+  - type: banner
+    pattern: "MySQL"
+
+emit:
+  title: MySQL Database Service Bound to Network Listener
+  evidence:
+    include:
+      - banner
+    max_bytes: 512
+  evidence_signature:
+    - mysql
+    - exposure

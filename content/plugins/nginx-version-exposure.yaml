@@ -1,0 +1,44 @@
+id: nginx-version-exposure
+schema_version: 2
+
+info:
+  name: Nginx HTTP Server Version Information Disclosure
+  family: web
+  severity: low
+  cve: []
+  cwe:
+    - CWE-200
+  references:
+    - https://nginx.org/en/docs/http/ngx_http_core_module.html#server_tokens
+  description: The remote Nginx web server discloses its exact version number in the Server response header, aiding targeted exploitation by attackers.
+  remediation: Set 'server_tokens off;' in /etc/nginx/nginx.conf and reload the server.
+  safety: active-safe
+  method: active_probe
+  confidence: confirmed
+  timeout_seconds: 5
+
+requires:
+  service:
+    - http
+    - https
+    - nginx
+  ports:
+    - 80
+    - 443
+    - 8080
+    - 8443
+
+matchers_condition: and
+matchers:
+  - type: banner
+    pattern: "nginx/[0-9]+"
+
+emit:
+  title: Nginx Server Version Information Disclosure
+  evidence:
+    include:
+      - banner
+    max_bytes: 512
+  evidence_signature:
+    - nginx
+    - server_tokens
