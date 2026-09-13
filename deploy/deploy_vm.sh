@@ -11,6 +11,7 @@ echo "Target: ${TARGET_USER}@${TARGET_HOST}"
 echo "========================================================"
 
 echo "[1/5] Building static Linux amd64 binary..."
+cp -f web/index.html pkg/server/index.html
 mkdir -p dist
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/sieve ./cmd/sieve
 echo "✓ Binary built successfully: $(ls -lh dist/sieve | awk '{print $5}')"

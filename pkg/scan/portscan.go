@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mosfaqur/sieve-security/pkg/models"
@@ -25,6 +28,64 @@ var DefaultTopPorts = []int{
 // DiscoveryPingPorts provides fast liveness check ports.
 var DiscoveryPingPorts = []int{21, 22, 80, 443, 445, 3128, 3389, 8006, 8080, 8443}
 
+// ParsePortSpec parses a port specification string (e.g. "top1000", "all", "1-65535", "22,80,443", "1-1024").
+func ParsePortSpec(spec string) ([]int, error) {
+	spec = strings.TrimSpace(strings.ToLower(spec))
+	if spec == "" || spec == "default" || spec == "top1000" {
+		return DefaultTopPorts, nil
+	}
+	if spec == "all" || spec == "1-65535" {
+		all := make([]int, 65535)
+		for i := 1; i <= 65535; i++ {
+			all[i-1] = i
+		}
+		return all, nil
+	}
+
+	seen := make(map[int]bool)
+	var ports []int
+
+	parts := strings.Split(spec, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if strings.Contains(part, "-") {
+			rangeParts := strings.Split(part, "-")
+			if len(rangeParts) != 2 {
+				return nil, fmt.Errorf("invalid port range: %s", part)
+			}
+			start, err1 := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+			end, err2 := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
+			if err1 != nil || err2 != nil || start < 1 || end > 65535 || start > end {
+				return nil, fmt.Errorf("invalid port range: %s", part)
+			}
+			for p := start; p <= end; p++ {
+				if !seen[p] {
+					seen[p] = true
+					ports = append(ports, p)
+				}
+			}
+		} else {
+			p, err := strconv.Atoi(part)
+			if err != nil || p < 1 || p > 65535 {
+				return nil, fmt.Errorf("invalid port number: %s", part)
+			}
+			if !seen[p] {
+				seen[p] = true
+				ports = append(ports, p)
+			}
+		}
+	}
+
+	if len(ports) == 0 {
+		return DefaultTopPorts, nil
+	}
+	sort.Ints(ports)
+	return ports, nil
+}
+
 // PortResult represents an individual port probe outcome.
 type PortResult struct {
 	Port     int
@@ -40,6 +101,7 @@ type ScanOptions struct {
 	MaxPPS         int // Rate limiter ceiling (§13.1)
 	Timeout        time.Duration
 	SafetyCeiling  models.SafetyClass
+	OnProgress     func(scanned, total, openFound int)
 }
 
 // Scanner performs scoped, rate-limited network probes.
@@ -94,20 +156,43 @@ func (s *Scanner) ScanPorts(ctx context.Context, targetIP net.IP, opts ScanOptio
 
 	concurrency := opts.MaxConcurrency
 	if concurrency <= 0 {
-		concurrency = 50
+		if len(ports) > 5000 {
+			concurrency = 400
+		} else if len(ports) > 500 {
+			concurrency = 150
+		} else {
+			concurrency = 50
+		}
 	}
 
 	timeout := opts.Timeout
 	if timeout <= 0 {
-		timeout = 1500 * time.Millisecond
+		if len(ports) > 5000 {
+			timeout = 750 * time.Millisecond
+		} else {
+			timeout = 1500 * time.Millisecond
+		}
 	}
 
-	rateLimiter := time.NewTicker(time.Second / time.Duration(max(opts.MaxPPS, 100)))
+	pps := opts.MaxPPS
+	if pps <= 0 {
+		if len(ports) > 5000 {
+			pps = 3000
+		} else {
+			pps = 2000
+		}
+	}
+
+	rateLimiter := time.NewTicker(time.Second / time.Duration(max(pps, 100)))
 	defer rateLimiter.Stop()
 
 	resultsChan := make(chan PortResult, len(ports))
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
+
+	var scannedCount int64
+	var openCount int64
+	total := len(ports)
 
 	for _, p := range ports {
 		select {
@@ -127,8 +212,16 @@ func (s *Scanner) ScanPorts(ctx context.Context, targetIP net.IP, opts ScanOptio
 			defer func() { <-sem }()
 
 			res := s.probeTCPPort(targetIP, port, timeout)
+			sc := atomic.AddInt64(&scannedCount, 1)
 			if res.State == "open" {
+				oc := atomic.AddInt64(&openCount, 1)
 				resultsChan <- res
+				if opts.OnProgress != nil {
+					opts.OnProgress(int(sc), total, int(oc))
+				}
+			} else if opts.OnProgress != nil && sc%250 == 0 {
+				oc := atomic.LoadInt64(&openCount)
+				opts.OnProgress(int(sc), total, int(oc))
 			}
 		}(p)
 	}

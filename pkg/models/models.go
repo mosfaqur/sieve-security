@@ -258,31 +258,38 @@ type ScanPolicy struct {
 
 // ScanRun models a scan execution (§6.6, §58).
 type ScanRun struct {
-	ID             string            `json:"id"`
-	TenantID       string            `json:"tenant_id"`
-	NetworkZoneID  string            `json:"network_zone_id"`
-	PolicyID       string            `json:"policy_id"`
-	ScopeID        string            `json:"scope_id"`
-	Status         string            `json:"status"` // pending, running, completed, partial, failed, cancelled
-	Targets        []string          `json:"targets"`
-	StartTime      time.Time         `json:"start_time"`
-	EndTime        *time.Time        `json:"end_time,omitempty"`
-	ProgressPct    int               `json:"progress_pct"`
-	CurrentPhase   string            `json:"current_phase"`
-	HostsTargeted  int               `json:"hosts_targeted"`
-	HostsLive      int               `json:"hosts_live"`
-	HostsAssessed  int               `json:"hosts_assessed"`
-	Unreachable    int               `json:"unreachable"`
-	TotalFindings   int               `json:"total_findings"`
-	DiscoveredPorts []int             `json:"discovered_ports,omitempty"`
-	SummaryMessage  string            `json:"summary_message,omitempty"`
-	CriticalCount   int               `json:"critical_count"`
-	HighCount       int               `json:"high_count"`
-	MediumCount     int               `json:"medium_count"`
-	LowCount        int               `json:"low_count"`
-	InfoCount       int               `json:"info_count"`
-	DataQuality     DataQualityReport `json:"data_quality"`
-	Diff            DiffSummary       `json:"diff"`
+	ID                 string            `json:"id"`
+	TenantID           string            `json:"tenant_id"`
+	NetworkZoneID      string            `json:"network_zone_id"`
+	PolicyID           string            `json:"policy_id"`
+	ScopeID            string            `json:"scope_id"`
+	Status             string            `json:"status"` // pending, running, completed, partial, failed, cancelled
+	Targets            []string          `json:"targets"`
+	StartTime          time.Time         `json:"start_time"`
+	EndTime            *time.Time        `json:"end_time,omitempty"`
+	ProgressPct        int               `json:"progress_pct"`
+	CurrentPhase       string            `json:"current_phase"`
+	HostsTargeted      int               `json:"hosts_targeted"`
+	HostsLive          int               `json:"hosts_live"`
+	HostsAssessed      int               `json:"hosts_assessed"`
+	Unreachable        int               `json:"unreachable"`
+	TotalFindings      int               `json:"total_findings"`
+	DiscoveredPorts    []int             `json:"discovered_ports,omitempty"`
+	DiscoveredServices []Service         `json:"discovered_services,omitempty"`
+	Findings           []*Finding        `json:"findings,omitempty"`
+	Remediations       []*RemediationItem`json:"remediations,omitempty"`
+	PortRange          string            `json:"port_range,omitempty"`
+	SafetyCeiling      string            `json:"safety_ceiling,omitempty"`
+	MaxPPS             int               `json:"max_pps,omitempty"`
+	Logs               []string          `json:"logs,omitempty"`
+	SummaryMessage     string            `json:"summary_message,omitempty"`
+	CriticalCount      int               `json:"critical_count"`
+	HighCount          int               `json:"high_count"`
+	MediumCount        int               `json:"medium_count"`
+	LowCount           int               `json:"low_count"`
+	InfoCount          int               `json:"info_count"`
+	DataQuality        DataQualityReport `json:"data_quality"`
+	Diff               DiffSummary       `json:"diff"`
 }
 
 // DataQualityReport highlights scan completeness and blind spots (§68.4).
